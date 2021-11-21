@@ -17,6 +17,7 @@ type problem struct{
 
 func main() {
 	filename := flag.String("csv", "questions.csv", "a csv file in the format of 'question,answer'")
+	timeLimit := flag.Int("limit", 30, "time limit for the quiz in seconds")
 	flag.Parse()
 
 	records, err := readCsv(*filename)
@@ -25,19 +26,33 @@ func main() {
 	}
 	
 	problems := parseRecords(records)
-
+	stopwatch := time.NewTimer(time.Duration(*timeLimit) * time.Second)
 	score := 0
 	answer := ""
+
 	fmt.Println("Starting quiz...")
 	time.Sleep(1 * time.Second)
-	for i, problem := range problems {
-		fmt.Printf("\nProblem #%d\n", i+1)
-		fmt.Println(problem.question)
-		fmt.Scanf("%s\n", &answer)
-		if answer == problem.answer {
-			score++
+	problemloop:
+		for i, problem := range problems {
+			fmt.Printf("\nProblem #%d\n", i+1)
+			fmt.Println(problem.question)
+
+			answerChan := make(chan string)
+			go func(answer string) {
+				fmt.Scanf("%s\n", &answer)
+				answerChan <- answer
+			}(answer)
+
+			select {
+			case <-stopwatch.C:
+				fmt.Printf("\nYour time is up!")
+				break problemloop
+			case answer := <-answerChan:
+				if answer == problem.answer {
+					score++
+				}
+			}
 		}
-	}
 
 	fmt.Printf("\nYour results are being calculated... \n")
 	time.Sleep(1 * time.Second)
